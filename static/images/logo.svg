@@ -1,0 +1,19 @@
+<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <!-- Outer ring -->
+  <circle cx="60" cy="60" r="57" fill="#0d0d1c" stroke="#7c3aed" stroke-width="1.5" stroke-opacity="0.5"/>
+
+  <!-- Basketball -->
+  <circle cx="60" cy="60" r="28" fill="#f97316"/>
+  <!-- Basketball seams -->
+  <path d="M32 60 Q60 45 88 60" stroke="#1a0800" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M32 60 Q60 75 88 60" stroke="#1a0800" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <line x1="60" y1="32" x2="60" y2="88" stroke="#1a0800" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Sync arrow top-right -->
+  <path d="M80 26 A 34 34 0 0 1 97 58" stroke="#a78bfa" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <polygon points="77,18 86,30 71,31" fill="#a78bfa"/>
+
+  <!-- Sync arrow bottom-left -->
+  <path d="M40 94 A 34 34 0 0 1 23 62" stroke="#a78bfa" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <polygon points="43,102 34,90 49,89" fill="#a78bfa"/>
+</svg>
