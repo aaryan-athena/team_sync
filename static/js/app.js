@@ -1,4 +1,4 @@
-/* ===== TEAM SYNC — APP LOGIC ===== */
+/* ===== HOOP SYNC — APP LOGIC ===== */
 
 const DEFAULT_THRESHOLDS = {
   0: 0.60, // Ball
@@ -181,7 +181,7 @@ function downloadVideo() {
   if (!state.fileId) return;
   const link = document.createElement('a');
   link.href = `/download/${state.fileId}`;
-  link.download = 'team_sync_analysis.mp4';
+  link.download = 'hoop_sync_analysis.mp4';
   link.click();
 }
 
