@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hoop Sync – AI Basketball Analytics</title>
+  <meta name="description" content="AI-powered basketball shot analysis. Upload your game footage and get real-time shot tracking, accuracy metrics, and detailed analytics." />
+  <link rel="icon" href="/static/images/logo.svg" />
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+
+<!-- Background orbs -->
+<div class="bg-orbs">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+</div>
+
+<!-- ===== NAVBAR ===== -->
+<nav class="navbar">
+  <div class="container nav-inner">
+    <a href="/" class="nav-logo">
+      <img src="/static/images/logo.svg" alt="Hoop Sync" class="nav-logo-img" />
+      <span class="nav-logo-text gradient-text">Hoop Sync</span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="#features">Features</a></li>
+      <li><a href="#how-it-works">How It Works</a></li>
+      <li><a href="#performance">Performance</a></li>
+      <li><a href="#modes">Modes</a></li>
+    </ul>
+    <a href="/app" class="btn btn-primary">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+      Launch App
+    </a>
+  </div>
+</nav>
+
+<!-- ===== HERO ===== -->
+<section class="hero">
+  <div class="container">
+    <div class="hero-grid">
+      <div>
+        <div class="hero-eyebrow">
+          <span class="badge badge-purple">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
+            AI-Powered Analytics
+          </span>
+          <span class="badge badge-orange">mAP50: 0.909</span>
+        </div>
+        <h1 class="hero-title">
+          Elevate Your <span class="gradient-text">Game</span><br/>with AI Shot Analysis
+        </h1>
+        <p class="hero-subtitle">
+          Hoop Sync uses a custom-trained YOLOv11 model to detect shots, baskets, and players in your basketball footage — delivering real-time accuracy metrics without any manual counting.
+        </p>
+        <div class="hero-actions">
+          <a href="/app" class="btn btn-primary btn-lg">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+            Start Analyzing
+          </a>
+          <a href="#how-it-works" class="btn btn-ghost btn-lg">Learn More</a>
+        </div>
+      </div>
+
+      <!-- Hero visual -->
+      <div class="hero-visual">
+        <div class="hero-mockup">
+          <div class="detection-demo">
+            <!-- Ball (orange circle) -->
+            <div class="dbox dbox-ball">
+              <span class="dbox-label">Ball 0.87</span>
+              <span class="dbox-inner">🏀</span>
+            </div>
+            <!-- Player (green rectangle) -->
+            <div class="dbox dbox-player">
+              <span class="dbox-label">Player 0.94</span>
+              <span class="dbox-inner">🏃</span>
+            </div>
+            <!-- Basket / hoop (red rectangle, top) -->
+            <div class="dbox dbox-basket">
+              <span class="dbox-label">Basket 0.91</span>
+              <span class="dbox-inner" style="flex-direction:column;gap:1px;">
+                <svg width="46" height="28" viewBox="0 0 46 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="1" y="1" width="44" height="5" rx="2.5" fill="#ef4444" opacity="0.9"/>
+                  <path d="M8 6 Q23 26 38 6" stroke="#ef4444" stroke-width="1.5" fill="none" opacity="0.6" stroke-dasharray="3 2"/>
+                  <line x1="23" y1="1" x2="23" y2="6" stroke="#ef4444" stroke-width="1.5"/>
+                </svg>
+              </span>
+            </div>
+            <!-- Player Shooting (indigo rectangle) -->
+            <div class="dbox dbox-shooter">
+              <span class="dbox-label">Shooting 0.82</span>
+              <span class="dbox-inner">⛹️</span>
+            </div>
+          </div>
+          <div class="hud-strip">
+            <div class="hud-stat">
+              <div class="hud-stat-val" style="color:var(--text-primary)">12</div>
+              <div class="hud-stat-lbl">Shots</div>
+            </div>
+            <div class="hud-stat">
+              <div class="hud-stat-val" style="color:var(--success)">8</div>
+              <div class="hud-stat-lbl">Baskets</div>
+            </div>
+            <div class="hud-stat">
+              <div class="hud-stat-val" style="color:var(--cyan)">66.7%</div>
+              <div class="hud-stat-lbl">Accuracy</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ===== FEATURES ===== -->
+<section class="section" id="features">
+  <div class="container">
+    <div style="text-align:center;margin-bottom:56px;">
+      <p class="section-label">What We Offer</p>
+      <h2 class="section-title">Everything You Need to <span class="gradient-text">Analyze Your Game</span></h2>
+      <p class="section-desc" style="margin:0 auto;">From automatic shot detection to frame-perfect basket tracking — Hoop Sync handles the analysis so you can focus on improving.</p>
+    </div>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon" style="background:rgba(124,58,237,0.15);">🎯</div>
+        <div class="feature-title">Shot Detection</div>
+        <div class="feature-desc">
+          YOLOv11 identifies "Player Shooting" posture with a custom confidence threshold, counting each attempt without double-counting thanks to a 1.5-second cooldown system.
+        </div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:rgba(249,115,22,0.15);">🏀</div>
+        <div class="feature-title">Basket Tracking</div>
+        <div class="feature-desc">
+          Detects "Ball in Basket" events with a 2-second cooldown to prevent false positives. If a basket is scored without a detected shot, one is automatically added.
+        </div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:rgba(6,182,212,0.15);">📊</div>
+        <div class="feature-title">Live Statistics</div>
+        <div class="feature-desc">
+          Real-time HUD overlay showing shots attempted, baskets made, and shooting accuracy percentage — updated every frame as the video is processed.
+        </div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:rgba(16,185,129,0.15);">⚡</div>
+        <div class="feature-title">Three Analysis Modes</div>
+        <div class="feature-desc">
+          Choose Full Tracking (bounding boxes + HUD), Stats & Effects (clean view with animations), or Stats Only (minimal overlay). Each mode fits a different use case.
+        </div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:rgba(245,158,11,0.15);">🎛️</div>
+        <div class="feature-title">Custom Thresholds</div>
+        <div class="feature-desc">
+          Adjust confidence thresholds per detection class in real time. Tuning these for your lighting and camera angle improves detection accuracy significantly.
+        </div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:rgba(239,68,68,0.15);">🧹</div>
+        <div class="feature-title">Auto Cleanup</div>
+        <div class="feature-desc">
+          Uploaded and processed files are automatically deleted after 30 minutes, keeping the server lean and your footage private without any manual action.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ===== HOW IT WORKS ===== -->
+<section class="section" id="how-it-works">
+  <div class="container">
+    <div style="text-align:center;margin-bottom:56px;">
+      <p class="section-label">How It Works</p>
+      <h2 class="section-title">Three Steps to <span class="gradient-text-cyan">Your Analysis</span></h2>
+    </div>
+    <div class="steps-grid">
+      <div class="step-card">
+        <div class="step-num">1</div>
+        <div class="step-title">Upload Your Footage</div>
+        <div class="step-desc">Select a basketball game video (up to 3 minutes). Enable Test Mode to preview with just the first 15 seconds.</div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">2</div>
+        <div class="step-title">Configure & Start</div>
+        <div class="step-desc">Pick your processing mode, tweak detection thresholds if needed, then hit Start Analysis. The AI handles everything else.</div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">3</div>
+        <div class="step-title">Download & Review</div>
+        <div class="step-desc">Once complete, download the annotated video with a full performance summary screen at the end — shots, baskets, accuracy, and duration.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ===== PERFORMANCE ===== -->
+<section class="section" id="performance">
+  <div class="container">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center;">
+      <div>
+        <p class="section-label">Model Performance</p>
+        <h2 class="section-title">Production-Grade <span class="gradient-text">Detection Accuracy</span></h2>
+        <p style="color:var(--text-secondary);margin-bottom:28px;line-height:1.7;">
+          The YOLOv11s model was trained on a custom basketball dataset from Roboflow using sports-optimized augmentations including HSV saturation tuning for orange ball detection, shear for camera angle robustness, and mixup for player overlap handling.
+        </p>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <div class="alert alert-info">
+            <span>🎓</span>
+            <span>Trained with AdamW optimizer, cosine learning rate decay over 200 epochs on an NVIDIA GTX 1060.</span>
+          </div>
+          <div class="alert alert-success">
+            <span>✅</span>
+            <span>Detects 5 classes: Ball, Ball in Basket, Player, Basket, and Player Shooting.</span>
+          </div>
+        </div>
+      </div>
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-val gradient-text">0.909</div>
+          <div class="metric-lbl">mAP50</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-val gradient-text">0.623</div>
+          <div class="metric-lbl">mAP50-95</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-val" style="color:var(--success)">5</div>
+          <div class="metric-lbl">Detection Classes</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-val" style="color:var(--cyan)">200</div>
+          <div class="metric-lbl">Training Epochs</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ===== MODES ===== -->
+<section class="section" id="modes">
+  <div class="container">
+    <div style="text-align:center;margin-bottom:48px;">
+      <p class="section-label">Processing Modes</p>
+      <h2 class="section-title">Choose Your <span class="gradient-text">View Style</span></h2>
+    </div>
+    <div class="modes-grid">
+      <div class="mode-card">
+        <div class="mode-tag"><span class="badge badge-purple">Full Tracking</span></div>
+        <div class="mode-title">Bounding Boxes + HUD + Effects</div>
+        <div class="mode-desc">Shows all detection boxes (ball, players, basket) in color-coded rectangles with confidence scores, plus the live stats HUD and scoring animations. Best for debugging or coaching sessions where visibility of every detection matters.</div>
+      </div>
+      <div class="mode-card">
+        <div class="mode-tag"><span class="badge badge-orange">Stats & Effects</span></div>
+        <div class="mode-title">Clean View + HUD + Animations</div>
+        <div class="mode-desc">Hides bounding boxes but keeps the live stats overlay and the pulsing basket-scoring animation. Great for creating highlight reels or sharing with players who don't need to see raw AI output.</div>
+      </div>
+      <div class="mode-card">
+        <div class="mode-tag"><span class="badge badge-cyan">Stats Only</span></div>
+        <div class="mode-title">Minimal HUD Overlay</div>
+        <div class="mode-desc">Just the scoreboard — no boxes, no animations. A clean, minimal look for presentations or situations where you want the original footage to remain as unobstructed as possible while still seeing the stats.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ===== CTA ===== -->
+<section class="cta-section">
+  <div class="container">
+    <div class="cta-card">
+      <p class="section-label" style="text-align:center;">Ready to Play?</p>
+      <h2 class="cta-title">Start Analyzing Your <span class="gradient-text">Basketball Footage</span></h2>
+      <p class="cta-subtitle">Upload a video, let the AI do the work, and download your annotated analysis in minutes.</p>
+      <div class="cta-actions">
+        <a href="/app" class="btn btn-primary btn-lg">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+          Open Hoop Sync
+        </a>
+        <a href="https://docs.ultralytics.com/models/yolo11/" target="_blank" rel="noopener" class="btn btn-ghost btn-lg">YOLOv11 Docs</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FOOTER ===== -->
+<footer class="footer">
+  <div class="container">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <img src="/static/images/logo.svg" alt="Hoop Sync" style="width:20px;height:20px;border-radius:4px;opacity:0.6;" />
+        <span>Hoop Sync v1.0</span>
+      </div>
+      <div style="display:flex;gap:20px;">
+        <a href="https://roboflow.com" target="_blank" rel="noopener">Dataset: Roboflow</a>
+        <a href="https://docs.ultralytics.com" target="_blank" rel="noopener">YOLOv11</a>
+      </div>
+      <span>Built with FastAPI &amp; Python</span>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
