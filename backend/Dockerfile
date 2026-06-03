@@ -18,6 +18,13 @@ COPY . .
 
 RUN mkdir -p uploads processed
 
+# Prevent Python stdout buffering so logs appear immediately
+ENV PYTHONUNBUFFERED=1
+# Prevent OpenMP/MKL from spawning thread pools that deadlock inside background threads
+ENV OMP_NUM_THREADS=1
+ENV MKL_NUM_THREADS=1
+ENV OPENBLAS_NUM_THREADS=1
+
 EXPOSE 7860
 
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "7860"]

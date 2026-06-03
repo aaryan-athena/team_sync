@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import torch
 from ultralytics import YOLO
 from fastapi import FastAPI, File, UploadFile, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,6 +12,7 @@ import shutil
 import uuid
 import uvicorn
 import threading
+import traceback
 from collections import deque
 from enum import Enum
 import time
@@ -88,6 +90,9 @@ def load_model():
     return model
 
 yolo_model = load_model()
+# Force single-threaded PyTorch so it never deadlocks inside background threads
+torch.set_num_threads(1)
+torch.set_num_interop_threads(1)
 
 # ==================== CLEANUP SERVICE ====================
 class AutoCleanup:
@@ -320,28 +325,36 @@ class VideoProcessor:
             frame_idx = 0
             
             self._update_status("processing", 0, max_frames, stats)
-            print(f"🎬 Processing {self.file_id} | Mode: {self.mode.value} | Frames: {max_frames}")
+            print(f"🎬 Processing {self.file_id} | Mode: {self.mode.value} | Frames: {max_frames}", flush=True)
 
             # read frame by frame using a while loop
             while cap.isOpened() and frame_idx < max_frames:
                 # check if the user is pressed "Stop"
                 if stop_flags.get(self.file_id, False):
-                    print(f"🛑 Stopped by user.")
+                    print(f"🛑 Stopped by user.", flush=True)
                     break
 
-                # take the single current frame    
+                # take the single current frame
                 success, frame = cap.read()
-                if not success: break
-                
+                if not success:
+                    print(f"⚠️ cap.read() failed at frame {frame_idx}", flush=True)
+                    break
+
+                if frame_idx == 0:
+                    print(f"📷 First frame read OK: {frame.shape}", flush=True)
+
                 # create a copy of the original frame (it is a good practice)
                 annotated = frame.copy()
-                
-                # --- TRACKING --- (the model analyzes the original frame, but modifies the copy )
-                # detection using the model
-                results = yolo_model.track(
-                    frame, persist=True, verbose=False, 
-                    conf=0.25, tracker="bytetrack.yaml", imgsz=640
-                )
+
+                # --- DETECTION --- run single-threaded inference inside no_grad context
+                if frame_idx == 0:
+                    print("🤖 Running first YOLO inference...", flush=True)
+                with torch.no_grad():
+                    results = yolo_model.predict(
+                        frame, verbose=False, conf=0.25, imgsz=640
+                    )
+                if frame_idx == 0:
+                    print("✅ First inference done.", flush=True)
                 
                 # --- LOGIC --- 
                 # Update scores if it finds shots or baskets. 
@@ -376,7 +389,7 @@ class VideoProcessor:
                 summary_frame = Visualizer.draw_final_screen(w, h, stats, frame_idx, fps)
                 for _ in range(int(fps * 5)): writer.write(summary_frame)
                 self._update_status("completed", frame_idx, max_frames, stats)
-                print(f"✅ Finished. Acc: {stats.accuracy:.1f}%")
+                print(f"✅ Finished. Acc: {stats.accuracy:.1f}%", flush=True)
 
             # close the files
             cap.release()
@@ -384,7 +397,8 @@ class VideoProcessor:
             if self.file_id in stop_flags: del stop_flags[self.file_id]
 
         except Exception as e:
-            print(f"❌ Error: {e}")
+            print(f"❌ Error processing {self.file_id}: {e}", flush=True)
+            print(traceback.format_exc(), flush=True)
             processing_status[self.file_id] = {"status": "error", "message": str(e)}
 
     # Used to understand what is happening in the game and update the score
