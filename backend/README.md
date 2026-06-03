@@ -2,7 +2,7 @@
 title: Hoop Sync Backend
 emoji: 🏀
 colorFrom: purple
-colorTo: orange
+colorTo: yellow
 sdk: docker
 app_port: 7860
 pinned: false
