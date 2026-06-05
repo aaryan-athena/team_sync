@@ -334,10 +334,51 @@
               <option value="stats_only">Stats Only — Minimal HUD</option>
             </select>
           </div>
-          <button class="btn btn-outline btn-sm" id="btnLiveAdvanced">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 1.41 14.14A10 10 0 0 1 4.93 19.07 10 10 0 0 1 3.52 4.93 10 10 0 0 1 19.07 4.93"/></svg>
-            Advanced Thresholds
-          </button>
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-top:16px;padding-top:16px;border-top:1px solid var(--border-light);">
+            <div class="toggle-wrap" id="feedToggleWrap" style="cursor:pointer;">
+              <div class="toggle on" id="feedToggle"></div>
+              <div>
+                <div style="font-size:0.88rem;font-weight:600;" id="feedToggleLabel">Show Video Feed</div>
+                <div style="font-size:0.75rem;color:var(--text-muted);">Turn off for faster stats-only processing</div>
+              </div>
+            </div>
+            <button class="btn btn-outline btn-sm" id="btnLiveAdvanced">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 1.41 14.14A10 10 0 0 1 4.93 19.07 10 10 0 0 1 3.52 4.93 10 10 0 0 1 19.07 4.93"/></svg>
+              Advanced Thresholds
+            </button>
+          </div>
+        </div>
+
+        <!-- No-feed detection counts (visible in stats-only mode) -->
+        <div class="card card-body hidden" id="noFeedStatsSection">
+          <h3 style="font-size:1rem;margin-bottom:16px;">Current Frame Detections</h3>
+          <div class="detect-grid">
+            <div class="detect-item">
+              <span class="detect-icon">🏀</span>
+              <span class="detect-label">Ball</span>
+              <span class="detect-val" id="countBall">0</span>
+            </div>
+            <div class="detect-item">
+              <span class="detect-icon">👤</span>
+              <span class="detect-label">Players</span>
+              <span class="detect-val" id="countPlayer">0</span>
+            </div>
+            <div class="detect-item">
+              <span class="detect-icon">🏆</span>
+              <span class="detect-label">Basket</span>
+              <span class="detect-val" id="countBasket">0</span>
+            </div>
+            <div class="detect-item">
+              <span class="detect-icon">⛹️</span>
+              <span class="detect-label">Shooting</span>
+              <span class="detect-val" id="countShooting">0</span>
+            </div>
+            <div class="detect-item" style="grid-column:span 2;">
+              <span class="detect-icon">🎯</span>
+              <span class="detect-label">Ball in Basket</span>
+              <span class="detect-val" id="countBallInBasket">0</span>
+            </div>
+          </div>
         </div>
 
         <!-- Live stats (visible while streaming) -->

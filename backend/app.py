@@ -571,6 +571,7 @@ def download_result(file_id: str):
 async def live_feed_ws(
     websocket: WebSocket,
     mode: ProcessingMode = ProcessingMode.FULL_TRACKING,
+    show_feed: bool = True,
     thresholds: str = None
 ):
     """WebSocket endpoint for real-time live camera feed processing.
@@ -594,7 +595,8 @@ async def live_feed_ws(
     loop = asyncio.get_running_loop()
 
     persons_detected = 0
-    print(f"📡 Live session connected | mode={mode.value}", flush=True)
+    _cls_key = {0:"ball", 1:"ball_in_basket", 2:"player", 3:"basket", 4:"player_shooting"}
+    print(f"📡 Live session | mode={mode.value} feed={'on' if show_feed else 'off'}", flush=True)
     try:
         while True:
             raw = await websocket.receive_bytes()
@@ -609,35 +611,48 @@ async def live_feed_ws(
             results = await loop.run_in_executor(None, processor.infer, frame)
             processor.process_detections(results, stats, frame_idx)
 
-            # Count players for session summary
+            # Count detections per class for this frame
+            frame_counts = {v: 0 for v in _cls_key.values()}
             if results[0].boxes:
                 for box in results[0].boxes:
-                    if int(box.cls[0]) == 2 and float(box.conf[0]) >= active_thresholds.get(2, 0.3):
-                        persons_detected += 1
+                    cls  = int(box.cls[0])
+                    conf = float(box.conf[0])
+                    if conf >= active_thresholds.get(cls, 0.3):
+                        frame_counts[_cls_key[cls]] += 1
+                        if cls == 2:
+                            persons_detected += 1
 
-            # Draw annotations on the same frame that was processed — keeps boxes
-            # temporally aligned with what the user sees.
-            annotated = frame.copy()
-            if mode == ProcessingMode.FULL_TRACKING:
-                processor.draw_boxes(annotated, results)
-            anim_prog = stats.get_animation_progress(frame_idx)
-            if mode in (ProcessingMode.FULL_TRACKING, ProcessingMode.STATS_EFFECTS) and anim_prog > 0:
-                Visualizer.draw_basket_effect(annotated, stats.basket_position, anim_prog)
-            Visualizer.draw_hud(annotated, stats, w, h)
+            game_stats = {
+                "shots":    stats.shots_attempted,
+                "baskets":  stats.baskets_made,
+                "accuracy": round(stats.accuracy, 1),
+                "persons":  persons_detected
+            }
 
-            _, buf = cv2.imencode('.jpg', annotated, [cv2.IMWRITE_JPEG_QUALITY, 70])
-            b64 = base64.b64encode(buf.tobytes()).decode()
+            if show_feed:
+                # Draw annotations and send the annotated JPEG
+                annotated = frame.copy()
+                if mode == ProcessingMode.FULL_TRACKING:
+                    processor.draw_boxes(annotated, results)
+                anim_prog = stats.get_animation_progress(frame_idx)
+                if mode in (ProcessingMode.FULL_TRACKING, ProcessingMode.STATS_EFFECTS) and anim_prog > 0:
+                    Visualizer.draw_basket_effect(annotated, stats.basket_position, anim_prog)
+                Visualizer.draw_hud(annotated, stats, w, h)
+                _, buf = cv2.imencode('.jpg', annotated, [cv2.IMWRITE_JPEG_QUALITY, 70])
+                await websocket.send_json({
+                    "type": "frame",
+                    "data": base64.b64encode(buf.tobytes()).decode(),
+                    "frame_counts": frame_counts,
+                    "stats": game_stats
+                })
+            else:
+                # Stats-only mode: skip all drawing/encoding — much faster
+                await websocket.send_json({
+                    "type": "stats",
+                    "frame_counts": frame_counts,
+                    "stats": game_stats
+                })
 
-            await websocket.send_json({
-                "type": "frame",
-                "data": b64,
-                "stats": {
-                    "shots":    stats.shots_attempted,
-                    "baskets":  stats.baskets_made,
-                    "accuracy": round(stats.accuracy, 1),
-                    "persons":  persons_detected
-                }
-            })
             frame_idx += 1
 
     except WebSocketDisconnect:

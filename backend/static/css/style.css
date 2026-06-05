@@ -945,6 +945,32 @@ input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
   50%       { opacity: 0.35; }
 }
 
+/* ===== DETECT GRID (no-feed stats mode) ===== */
+.detect-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.detect-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 14px 8px 12px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  text-align: center;
+  transition: border-color var(--transition);
+}
+.detect-item:hover { border-color: var(--border); }
+.detect-icon  { font-size: 1.5rem; line-height: 1; }
+.detect-label { font-size: 0.7rem; color: var(--text-muted); font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; }
+.detect-val   { font-size: 1.8rem; font-weight: 800; color: var(--purple-light); line-height: 1; }
+
+/* Disabled toggle (while session is live) */
+.toggle-wrap.disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+
 /* ===== SESSION SUMMARY ===== */
 .session-meta {
   display: flex;

@@ -74,6 +74,7 @@ function bindEvents() {
   $('btnFlipCamera').addEventListener('click', flipCamera);
   $('btnLiveAdvanced').addEventListener('click', openModal);
   $('liveModeSelect').addEventListener('change', e => { liveState.mode = e.target.value; });
+  $('feedToggleWrap').addEventListener('click', toggleFeedDisplay);
   $('btnDownloadStats').addEventListener('click', downloadStats);
 }
 
@@ -290,8 +291,10 @@ const liveState = {
   status: 'idle',   // idle | connecting | live | error
   active: false,
   mode: 'full_tracking',
+  showFeed: true,   // true = annotated video; false = stats-only (much faster)
   stats: { shots: 0, baskets: 0, accuracy: 0, persons: 0 },
-  cameras: [],      // validated deviceIds, populated after first getUserMedia
+  frameCounts: { ball: 0, ball_in_basket: 0, player: 0, basket: 0, player_shooting: 0 },
+  cameras: [],
   cameraIndex: 0,
   sessionStart: null,
   sessionData:  null
@@ -327,7 +330,7 @@ async function startLiveFeed() {
       Object.fromEntries(Object.entries(state.thresholds).map(([k, v]) => [k, parseFloat(v)]))
     ));
     const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    liveState.ws = new WebSocket(`${wsProto}//${location.host}/live/ws?mode=${liveState.mode}&thresholds=${thresholdsJSON}`);
+    liveState.ws = new WebSocket(`${wsProto}//${location.host}/live/ws?mode=${liveState.mode}&show_feed=${liveState.showFeed}&thresholds=${thresholdsJSON}`);
 
     liveState.ws.onopen = () => {
       liveState.status = 'live';
@@ -350,6 +353,13 @@ async function startLiveFeed() {
         };
         img.src = 'data:image/jpeg;base64,' + msg.data;
         if (msg.stats) { liveState.stats = msg.stats; updateLiveStats(); }
+        if (liveState.active) sendLiveFrame();
+      } else if (msg.type === 'stats') {
+        // No-feed mode: tiny JSON payload, no JPEG decode needed
+        liveState.stats       = msg.stats;
+        liveState.frameCounts = msg.frame_counts || liveState.frameCounts;
+        updateLiveStats();
+        updateFrameCounts();
         if (liveState.active) sendLiveFrame();
       } else if (msg.type === 'error') {
         showLiveError(msg.message); stopLiveFeed();
@@ -410,8 +420,9 @@ function stopLiveFeed() {
     showSessionSummary(liveState.sessionData);
   }
 
-  liveState.status = 'idle';
-  liveState.stats  = { shots: 0, baskets: 0, accuracy: 0, persons: 0 };
+  liveState.status      = 'idle';
+  liveState.stats       = { shots: 0, baskets: 0, accuracy: 0, persons: 0 };
+  liveState.frameCounts = { ball: 0, ball_in_basket: 0, player: 0, basket: 0, player_shooting: 0 };
   updateLiveUI();
 }
 
@@ -443,8 +454,12 @@ function updateLiveStats() {
 function updateLiveUI() {
   const isLive = liveState.status === 'live', isConnecting = liveState.status === 'connecting';
   const isActive = isLive || isConnecting;
-  setVisible('liveCanvas',      isLive);
-  setVisible('livePlaceholder', !isLive);
+  setVisible('liveCanvas',         isLive && liveState.showFeed);
+  setVisible('noFeedStatsSection', isLive && !liveState.showFeed);
+  setVisible('livePlaceholder',    !isLive);
+  // Grey out the toggle while a session is running
+  const tw = $('feedToggleWrap');
+  if (tw) tw.classList.toggle('disabled', isActive);
   setVisible('liveDot',         isLive);
   setVisible('btnStartLive',    !isActive);
   setVisible('btnStopLive',     isActive);
@@ -461,6 +476,22 @@ function updateLiveUI() {
   const bi = badgeMap[liveState.status] || badgeMap.idle;
   const badge = $('liveBadge');
   if (badge) { badge.textContent = bi.text; badge.className = 'badge ' + bi.cls; }
+}
+
+function toggleFeedDisplay() {
+  if (liveState.active) return;  // locked while a session is running
+  liveState.showFeed = !liveState.showFeed;
+  $('feedToggle').classList.toggle('on', liveState.showFeed);
+  $('feedToggleLabel').textContent = liveState.showFeed ? 'Show Video Feed' : 'Stats Only Mode';
+}
+
+function updateFrameCounts() {
+  const c = liveState.frameCounts;
+  $('countBall').textContent         = c.ball            || 0;
+  $('countPlayer').textContent       = c.player          || 0;
+  $('countBasket').textContent       = c.basket          || 0;
+  $('countShooting').textContent     = c.player_shooting || 0;
+  $('countBallInBasket').textContent = c.ball_in_basket  || 0;
 }
 
 // ===== SESSION SUMMARY =====
