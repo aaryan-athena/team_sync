@@ -39,10 +39,8 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function bindEvents() {
-  // File input
   $('fileInput').addEventListener('change', onFileSelected);
 
-  // Upload zone click/drag
   const zone = $('uploadZone');
   zone.addEventListener('click', () => $('fileInput').click());
   zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
@@ -54,7 +52,6 @@ function bindEvents() {
     if (f && f.type.startsWith('video/')) setFile(f);
   });
 
-  // Buttons
   $('btnChangeFile').addEventListener('click', () => $('fileInput').click());
   $('btnStart').addEventListener('click', uploadAndProcess);
   $('btnStop').addEventListener('click', stopProcessing);
@@ -66,17 +63,12 @@ function bindEvents() {
   $('btnSaveThresholds').addEventListener('click', closeModal);
   $('modalOverlay').addEventListener('click', e => { if (e.target === $('modalOverlay')) closeModal(); });
 
-  // Mode selector
   $('processingMode').addEventListener('change', e => { state.processingMode = e.target.value; });
-
-  // Test mode toggle
   $('testModeToggle').addEventListener('click', toggleTestMode);
 
-  // Tab switching
   $('tabBtnUpload').addEventListener('click', () => switchTab('upload'));
   $('tabBtnLive').addEventListener('click', () => switchTab('live'));
 
-  // Live feed buttons
   $('btnStartLive').addEventListener('click', startLiveFeed);
   $('btnStopLive').addEventListener('click', stopLiveFeed);
   $('btnFlipCamera').addEventListener('click', flipCamera);
@@ -108,13 +100,11 @@ function formatBytes(b) {
 // ===== CORE ACTIONS =====
 async function uploadAndProcess() {
   if (!state.file) return;
-
   state.status = 'uploading';
   state.progress = 0;
   updateUI();
 
   try {
-    // 1. Upload
     const form = new FormData();
     form.append('file', state.file);
     const uploadRes = await fetch('/upload', { method: 'POST', body: form });
@@ -122,25 +112,16 @@ async function uploadAndProcess() {
     const uploadData = await uploadRes.json();
     state.fileId = uploadData.file_id;
 
-    // 2. Start Processing
     state.status = 'processing';
     updateUI();
 
     const thresholdsJSON = JSON.stringify(Object.fromEntries(
       Object.entries(state.thresholds).map(([k, v]) => [k, parseFloat(v)])
     ));
-    const params = new URLSearchParams({
-      test_mode: state.testMode,
-      mode: state.processingMode,
-      thresholds: thresholdsJSON
-    });
-
+    const params = new URLSearchParams({ test_mode: state.testMode, mode: state.processingMode, thresholds: thresholdsJSON });
     const procRes = await fetch(`/process/${state.fileId}?${params}`, { method: 'POST' });
     if (!procRes.ok) throw new Error('Processing start failed');
-
-    // 3. Poll
     startPoll();
-
   } catch (err) {
     state.status = 'error';
     state.errorMsg = err.message;
@@ -153,13 +134,11 @@ async function checkStatus() {
   try {
     const res = await fetch(`/status/${state.fileId}`);
     const data = await res.json();
-
     if (data.status === 'processing') {
       state.progress = data.percentage || 0;
       if (data.stats) state.stats = data.stats;
     } else if (data.status === 'completed') {
-      state.status = 'completed';
-      state.progress = 100;
+      state.status = 'completed'; state.progress = 100;
       if (data.stats) state.stats = data.stats;
       clearPoll();
     } else if (data.status === 'stopped') {
@@ -172,9 +151,7 @@ async function checkStatus() {
       clearPoll();
     }
     updateUI();
-  } catch (e) {
-    console.warn('Status poll error:', e);
-  }
+  } catch (e) { console.warn('Status poll error:', e); }
 }
 
 async function stopProcessing() {
@@ -184,9 +161,7 @@ async function stopProcessing() {
     state.status = 'stopped';
     clearPoll();
     updateUI();
-  } catch (e) {
-    console.error(e);
-  }
+  } catch (e) { console.error(e); }
 }
 
 function downloadVideo() {
@@ -199,31 +174,21 @@ function downloadVideo() {
 
 function resetApp() {
   clearPoll();
-  state.file = null;
-  state.fileId = null;
-  state.status = 'idle';
-  state.progress = 0;
-  state.stats = { shots: 0, baskets: 0, accuracy: 0 };
+  state.file = null; state.fileId = null; state.status = 'idle';
+  state.progress = 0; state.stats = { shots: 0, baskets: 0, accuracy: 0 };
   state.errorMsg = '';
   $('fileInput').value = '';
   updateUI();
 }
 
 // ===== POLLING =====
-function startPoll() {
-  clearPoll();
-  state.pollTimer = setInterval(checkStatus, 1000);
-}
-
-function clearPoll() {
-  if (state.pollTimer) { clearInterval(state.pollTimer); state.pollTimer = null; }
-}
+function startPoll() { clearPoll(); state.pollTimer = setInterval(checkStatus, 1000); }
+function clearPoll()  { if (state.pollTimer) { clearInterval(state.pollTimer); state.pollTimer = null; } }
 
 // ===== TEST MODE =====
 function toggleTestMode() {
   state.testMode = !state.testMode;
-  const t = $('testModeToggle');
-  t.classList.toggle('on', state.testMode);
+  $('testModeToggle').classList.toggle('on', state.testMode);
   $('testModeLabel').textContent = state.testMode ? 'Test Mode (15s)' : 'Test Mode';
 }
 
@@ -260,92 +225,61 @@ function resetThresholds() {
 }
 
 // ===== MODAL =====
-function openModal() {
-  renderThresholds();
-  $('modalOverlay').classList.add('open');
-}
-
-function closeModal() {
-  $('modalOverlay').classList.remove('open');
-}
+function openModal()  { renderThresholds(); $('modalOverlay').classList.add('open'); }
+function closeModal() { $('modalOverlay').classList.remove('open'); }
 
 // ===== UI UPDATE =====
 function updateUI() {
   const s = state;
-
-  // Upload zone vs file info
   setVisible('uploadZoneWrap', !s.file);
   setVisible('fileInfoWrap', !!s.file);
+  if (s.file) { $('fileName').textContent = s.file.name; $('fileSize').textContent = formatBytes(s.file.size); }
 
-  if (s.file) {
-    $('fileName').textContent = s.file.name;
-    $('fileSize').textContent = formatBytes(s.file.size);
-  }
-
-  // Buttons
   const isIdle = s.status === 'idle' && !!s.file;
   const isProcessing = s.status === 'processing' || s.status === 'uploading';
   const isDone = s.status === 'completed' || s.status === 'stopped';
 
-  setVisible('btnStart', isIdle);
-  setVisible('btnStop', isProcessing);
-  setVisible('btnDownload', s.status === 'completed');
-  setVisible('btnReset', isDone || s.status === 'error');
+  setVisible('btnStart',      isIdle);
+  setVisible('btnStop',       isProcessing);
+  setVisible('btnDownload',   s.status === 'completed');
+  setVisible('btnReset',      isDone || s.status === 'error');
   setVisible('btnChangeFile', !isProcessing);
-
-  setEnabled('btnStart', isIdle);
-  setEnabled('processingMode', !isProcessing);
-
-  // Progress section
+  setEnabled('btnStart',        isIdle);
+  setEnabled('processingMode',  !isProcessing);
   setVisible('progressSection', isProcessing || isDone || s.status === 'error');
 
-  // Status text
   const statusMap = {
-    idle:       { text: 'Ready',         cls: 'text-secondary' },
-    uploading:  { text: 'Uploading…',    cls: 'badge-purple' },
-    processing: { text: 'Analyzing…',    cls: 'badge-purple' },
-    completed:  { text: 'Complete',      cls: 'badge-green' },
-    stopped:    { text: 'Stopped',       cls: 'badge-orange' },
-    error:      { text: 'Error',         cls: 'badge-error' }
+    idle:       { text: 'Ready',      cls: 'text-secondary' },
+    uploading:  { text: 'Uploading…', cls: 'badge-purple'   },
+    processing: { text: 'Analyzing…', cls: 'badge-purple'   },
+    completed:  { text: 'Complete',   cls: 'badge-green'    },
+    stopped:    { text: 'Stopped',    cls: 'badge-orange'   },
+    error:      { text: 'Error',      cls: 'badge-error'    }
   };
   const si = statusMap[s.status] || statusMap.idle;
-  const statusEl = $('statusBadge');
-  statusEl.textContent = si.text;
-  statusEl.className = 'badge ' + si.cls;
+  $('statusBadge').textContent = si.text;
+  $('statusBadge').className   = 'badge ' + si.cls;
 
-  // Progress bar
-  $('progressBar').style.width = s.progress + '%';
-  $('progressPct').textContent = s.progress + '%';
-
-  // Stats
-  $('statShots').textContent = s.stats.shots ?? 0;
-  $('statBaskets').textContent = s.stats.baskets ?? 0;
+  $('progressBar').style.width  = s.progress + '%';
+  $('progressPct').textContent  = s.progress + '%';
+  $('statShots').textContent    = s.stats.shots    ?? 0;
+  $('statBaskets').textContent  = s.stats.baskets  ?? 0;
   $('statAccuracy').textContent = (s.stats.accuracy ?? 0).toFixed(1) + '%';
 
-  // Error
   setVisible('errorMsg', s.status === 'error');
   if (s.status === 'error') $('errorText').textContent = s.errorMsg || 'An error occurred.';
-
-  // Uploading indicator
   setVisible('uploadingNote', s.status === 'uploading');
 }
 
-function setVisible(id, visible) {
-  const el = $(id);
-  if (el) el.classList.toggle('hidden', !visible);
-}
-
-function setEnabled(id, enabled) {
-  const el = $(id);
-  if (el) el.disabled = !enabled;
-}
+function setVisible(id, visible) { const el=$(id); if(el) el.classList.toggle('hidden', !visible); }
+function setEnabled(id, enabled) { const el=$(id); if(el) el.disabled = !enabled; }
 
 // ===== TAB SWITCHING =====
 function switchTab(tab) {
   $('tabUpload').classList.toggle('hidden', tab !== 'upload');
-  $('tabLive').classList.toggle('hidden', tab !== 'live');
+  $('tabLive').classList.toggle('hidden',   tab !== 'live');
   $('tabBtnUpload').classList.toggle('active', tab === 'upload');
-  $('tabBtnLive').classList.toggle('active', tab === 'live');
+  $('tabBtnLive').classList.toggle('active',   tab === 'live');
   if (tab !== 'live' && liveState.active) stopLiveFeed();
 }
 
@@ -353,38 +287,30 @@ function switchTab(tab) {
 const liveState = {
   ws: null,
   stream: null,
-  status: 'idle',
+  status: 'idle',   // idle | connecting | live | error
   active: false,
   mode: 'full_tracking',
   stats: { shots: 0, baskets: 0, accuracy: 0, persons: 0 },
-  cameras: [],
+  cameras: [],      // validated deviceIds, populated after first getUserMedia
   cameraIndex: 0,
-  frameTimer:    null,
-  pendingFrame:  false,
-  rafId:         null,
-  lastDetections: null,
-  lastBasketAnim: null,
-  lastFrameSize: { w: 640, h: 480 },
-  sessionStart:  null,
-  sessionData:   null
+  sessionStart: null,
+  sessionData:  null
 };
 
-const DETECT_COLORS = {
-  0: '#f97316', 1: '#fbbf24', 2: '#22c55e', 3: '#ef4444', 4: '#818cf8'
-};
-
-// ===== LIVE FEED ACTIONS =====
+// ===== LIVE FEED =====
 async function startLiveFeed() {
   liveState.status = 'connecting';
   updateLiveUI();
 
   try {
+    // Don't enumerate before getUserMedia — browsers return empty deviceIds until permission granted.
     const videoConstraints = { width: { ideal: 640 }, height: { ideal: 480 } };
     const currentId = liveState.cameras[liveState.cameraIndex];
     if (currentId) videoConstraints.deviceId = { exact: currentId };
 
     liveState.stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: false });
 
+    // Enumerate after permission — now deviceIds are real
     const devices = await navigator.mediaDevices.enumerateDevices();
     liveState.cameras = devices.filter(d => d.kind === 'videoinput' && d.deviceId).map(d => d.deviceId);
     if (liveState.cameras.length > 0) {
@@ -406,28 +332,15 @@ async function startLiveFeed() {
     liveState.ws.onopen = () => {
       liveState.status = 'live';
       liveState.active = true;
-      liveState.pendingFrame = false;
       liveState.sessionStart = new Date();
       setVisible('sessionSummary', false);
       updateLiveUI();
-      sendLiveFrame();  // kick off the pipeline; each response immediately triggers the next
+      sendLiveFrame();  // kick off — each annotated frame received triggers the next send
     };
 
     liveState.ws.onmessage = event => {
       const msg = JSON.parse(event.data);
-      liveState.pendingFrame = false;  // always unblock the frame pipeline first
-
-      if (msg.type === 'detections') {
-        // New protocol: server returns JSON coords, client renders on top of raw video
-        liveState.lastDetections = msg.detections;
-        liveState.lastBasketAnim = msg.basket_anim;
-        liveState.lastFrameSize  = { w: msg.frame_w, h: msg.frame_h };
-        liveState.stats = msg.stats;
-        updateLiveStats();
-      } else if (msg.type === 'frame') {
-        // Server sends the annotated JPEG — boxes are drawn on the exact processed frame,
-        // so position is always correct. Draw it and immediately request the next frame.
-        if (liveState.rafId) { cancelAnimationFrame(liveState.rafId); liveState.rafId = null; }
+      if (msg.type === 'frame') {
         const canvas = $('liveCanvas'), ctx = canvas.getContext('2d');
         const img = new Image();
         img.onload = () => {
@@ -437,7 +350,7 @@ async function startLiveFeed() {
         };
         img.src = 'data:image/jpeg;base64,' + msg.data;
         if (msg.stats) { liveState.stats = msg.stats; updateLiveStats(); }
-        if (liveState.active) sendLiveFrame();  // no timer overhead — fire immediately
+        if (liveState.active) sendLiveFrame();
       } else if (msg.type === 'error') {
         showLiveError(msg.message); stopLiveFeed();
       }
@@ -465,114 +378,28 @@ async function startLiveFeed() {
 }
 
 function sendLiveFrame() {
-  if (!liveState.active || !liveState.ws || liveState.ws.readyState !== WebSocket.OPEN) {
-    liveState.pendingFrame = false; return;
-  }
+  if (!liveState.active || !liveState.ws || liveState.ws.readyState !== WebSocket.OPEN) return;
   const offscreen = document.createElement('canvas');
   offscreen.width = 640; offscreen.height = 480;
   offscreen.getContext('2d').drawImage($('liveVideo'), 0, 0, 640, 480);
   offscreen.toBlob(blob => {
     if (liveState.active && liveState.ws && liveState.ws.readyState === WebSocket.OPEN)
       liveState.ws.send(blob);
-    else liveState.pendingFrame = false;
   }, 'image/jpeg', 0.8);
-}
-
-// ===== CLIENT-SIDE RENDERING (requestAnimationFrame loop) =====
-function renderLiveCanvas() {
-  if (!liveState.active) return;
-  const canvas = $('liveCanvas');
-  const ctx    = canvas.getContext('2d');
-  const video  = $('liveVideo');
-  const vw = video.videoWidth  || 640;
-  const vh = video.videoHeight || 480;
-  if (canvas.width !== vw)  canvas.width  = vw;
-  if (canvas.height !== vh) canvas.height = vh;
-
-  if (video.readyState >= 2) ctx.drawImage(video, 0, 0, vw, vh);
-
-  const fw = liveState.lastFrameSize.w || vw;
-  const fh = liveState.lastFrameSize.h || vh;
-  const sx = vw / fw, sy = vh / fh;
-
-  if (liveState.mode === 'full_tracking' && liveState.lastDetections)
-    drawDetections(ctx, liveState.lastDetections, sx, sy);
-  if (liveState.mode !== 'stats_only' && liveState.lastBasketAnim)
-    drawBasketAnim(ctx, liveState.lastBasketAnim, sx, sy);
-  drawHUD(ctx, liveState.stats || {}, vw, vh);
-
-  liveState.rafId = requestAnimationFrame(renderLiveCanvas);
-}
-
-function drawDetections(ctx, detections, sx, sy) {
-  if (!detections || !detections.length) return;
-  ctx.save();
-  for (const d of detections) {
-    const [x1, y1, x2, y2] = d.box;
-    const color = DETECT_COLORS[d.cls] || '#fff';
-    ctx.strokeStyle = color; ctx.lineWidth = 2;
-    ctx.strokeRect(x1*sx, y1*sy, (x2-x1)*sx, (y2-y1)*sy);
-    ctx.fillStyle = color; ctx.font = '12px monospace';
-    ctx.fillText(`${d.label} ${d.conf.toFixed(2)}`, x1*sx, y1*sy > 16 ? y1*sy - 4 : y1*sy + 14);
-  }
-  ctx.restore();
-}
-
-function drawBasketAnim(ctx, anim, sx, sy) {
-  if (!anim || anim.progress <= 0) return;
-  const cx = anim.cx * sx, cy = anim.cy * sy, p = anim.progress;
-  let alpha = p < 0.15 ? p/0.15 : p > 0.85 ? (1-p)/0.15 : 1;
-  ctx.save(); ctx.globalAlpha = alpha * 0.7;
-  for (let i = 0; i < 4; i++) {
-    const lp = Math.max(0, Math.min(1, (p - i*0.1) / (1 - i*0.1)));
-    if (lp > 0) {
-      ctx.beginPath(); ctx.arc(cx, cy, 20 + lp*100, 0, Math.PI*2);
-      ctx.strokeStyle = '#fbbf24'; ctx.lineWidth = Math.max(2, 8*(1-lp)); ctx.stroke();
-    }
-  }
-  ctx.beginPath(); ctx.arc(cx, cy, 15*(1+Math.sin(p*Math.PI*4)*0.3), 0, Math.PI*2);
-  ctx.fillStyle = '#00ffff'; ctx.fill();
-  ctx.restore();
-}
-
-function drawHUD(ctx, stats, w, h) {
-  const pH = 90, pW = Math.min(620, w - 30), x = 15, y = h - pH - 15;
-  ctx.save();
-  ctx.globalAlpha = 0.88; ctx.fillStyle = 'rgba(14,14,22,0.92)';
-  if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(x, y, pW, pH, 8); ctx.fill();
-    ctx.beginPath(); ctx.roundRect(x, y, pW, pH, 8); }
-  else { ctx.fillRect(x, y, pW, pH); ctx.beginPath(); ctx.rect(x, y, pW, pH); }
-  ctx.globalAlpha = 1; ctx.strokeStyle = 'rgba(0,200,255,0.45)'; ctx.lineWidth = 1.5; ctx.stroke();
-
-  const cw = pW / 3;
-  function col(ox, label, val, color) {
-    ctx.fillStyle = 'rgba(150,148,184,1)'; ctx.font = '11px sans-serif'; ctx.fillText(label, x+ox, y+26);
-    ctx.fillStyle = color; ctx.font = 'bold 30px sans-serif'; ctx.fillText(String(val), x+ox, y+66);
-  }
-  col(20,       'SHOTS',    stats.shots   || 0, '#ffffff');
-  col(cw+20,    'BASKETS',  stats.baskets || 0, '#4ade80');
-  ctx.fillStyle='rgba(150,148,184,1)'; ctx.font='11px sans-serif'; ctx.fillText('ACCURACY', x+2*cw+20, y+26);
-  ctx.fillStyle='#22d3ee'; ctx.font='bold 24px sans-serif'; ctx.fillText(`${(stats.accuracy||0).toFixed(1)}%`, x+2*cw+20, y+64);
-  const bx=x+2*cw+20, by=y+74, bw=cw-40;
-  ctx.fillStyle='rgba(50,50,50,0.8)'; ctx.fillRect(bx, by, bw, 6);
-  const fw=((stats.accuracy||0)/100)*bw; if(fw>0){ctx.fillStyle='#22d3ee'; ctx.fillRect(bx, by, fw, 6);}
-  ctx.restore();
 }
 
 function stopLiveFeed() {
   const wasActive = liveState.active;
   liveState.active = false;
-  if (liveState.frameTimer) { clearInterval(liveState.frameTimer); liveState.frameTimer = null; }
-  if (liveState.rafId)      { cancelAnimationFrame(liveState.rafId); liveState.rafId = null; }
-  if (liveState.ws)         { liveState.ws.close(); liveState.ws = null; }
-  if (liveState.stream)     { liveState.stream.getTracks().forEach(t => t.stop()); liveState.stream = null; }
+  if (liveState.ws)     { liveState.ws.close(); liveState.ws = null; }
+  if (liveState.stream) { liveState.stream.getTracks().forEach(t => t.stop()); liveState.stream = null; }
   $('liveVideo').srcObject = null;
 
   if (wasActive && liveState.sessionStart) {
     const dur = Math.round((new Date() - liveState.sessionStart) / 1000);
     liveState.sessionData = {
-      date: liveState.sessionStart.toLocaleDateString(),
-      time: liveState.sessionStart.toLocaleTimeString(),
+      date:             liveState.sessionStart.toLocaleDateString(),
+      time:             liveState.sessionStart.toLocaleTimeString(),
       duration_seconds: dur,
       shots:    liveState.stats?.shots    || 0,
       baskets:  liveState.stats?.baskets  || 0,
@@ -608,8 +435,8 @@ function showLiveError(msg) {
 }
 
 function updateLiveStats() {
-  $('liveStatShots').textContent    = liveState.stats.shots   ?? 0;
-  $('liveStatBaskets').textContent  = liveState.stats.baskets ?? 0;
+  $('liveStatShots').textContent    = liveState.stats.shots    ?? 0;
+  $('liveStatBaskets').textContent  = liveState.stats.baskets  ?? 0;
   $('liveStatAccuracy').textContent = (liveState.stats.accuracy ?? 0).toFixed(1) + '%';
 }
 
@@ -626,8 +453,10 @@ function updateLiveUI() {
   setEnabled('liveModeSelect',  !isActive);
   if (liveState.status !== 'error') setVisible('liveError', false);
   const badgeMap = {
-    idle: {text:'Ready', cls:'badge-purple'}, connecting: {text:'Connecting…', cls:'badge-orange'},
-    live: {text:'LIVE',  cls:'badge-live'},   error:       {text:'Error',       cls:'badge-error'}
+    idle:       { text: 'Ready',       cls: 'badge-purple' },
+    connecting: { text: 'Connecting…', cls: 'badge-orange' },
+    live:       { text: 'LIVE',        cls: 'badge-live'   },
+    error:      { text: 'Error',       cls: 'badge-error'  }
   };
   const bi = badgeMap[liveState.status] || badgeMap.idle;
   const badge = $('liveBadge');
@@ -651,9 +480,13 @@ function downloadStats() {
   if (!liveState.sessionData) return;
   const d = liveState.sessionData;
   const json = JSON.stringify({
-    session_date: d.date, session_time: d.time, duration_seconds: d.duration_seconds,
-    detection_mode: d.mode, shots_attempted: d.shots, baskets_made: d.baskets,
-    accuracy_percent: parseFloat((d.accuracy||0).toFixed(1)),
+    session_date:            d.date,
+    session_time:            d.time,
+    duration_seconds:        d.duration_seconds,
+    detection_mode:          d.mode,
+    shots_attempted:         d.shots,
+    baskets_made:            d.baskets,
+    accuracy_percent:        parseFloat((d.accuracy || 0).toFixed(1)),
     total_player_detections: d.persons
   }, null, 2);
   const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));

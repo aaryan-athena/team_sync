@@ -464,7 +464,7 @@ class LiveProcessor:
 
     def infer(self, frame):
         with torch.no_grad():
-            return yolo_model.predict(frame, verbose=False, conf=0.25, imgsz=416)
+            return yolo_model.predict(frame, verbose=False, conf=0.25, imgsz=320)
 
     def process_detections(self, results, stats, frame_idx):
         if not results[0].boxes: return
