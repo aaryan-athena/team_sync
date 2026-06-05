@@ -371,30 +371,31 @@ async function startLiveFeed() {
   updateLiveUI();
 
   try {
-    // Enumerate cameras on first start so flip knows what's available
-    if (liveState.cameras.length === 0) {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      liveState.cameras = devices
-        .filter(d => d.kind === 'videoinput')
-        .map(d => d.deviceId);
-    }
-
-    // Build video constraints — prefer specific deviceId when available
+    // Only use a specific deviceId if we already have a validated one from a previous
+    // successful session. Enumerating before getUserMedia returns empty deviceId strings
+    // on all major browsers (real IDs are hidden until permission is granted), so passing
+    // deviceId: { exact: "" } would throw an OverconstrainedError.
     const videoConstraints = { width: { ideal: 640 }, height: { ideal: 480 } };
-    if (liveState.cameras.length > 0) {
-      videoConstraints.deviceId = { exact: liveState.cameras[liveState.cameraIndex] };
-    }
+    const currentId = liveState.cameras[liveState.cameraIndex];
+    if (currentId) videoConstraints.deviceId = { exact: currentId };
 
     liveState.stream = await navigator.mediaDevices.getUserMedia({
       video: videoConstraints,
       audio: false
     });
 
-    // After first getUserMedia enumerateDevices returns real labels/ids — refresh list
+    // Enumerate AFTER permission is granted — deviceIds are now populated
     const devices = await navigator.mediaDevices.enumerateDevices();
     liveState.cameras = devices
-      .filter(d => d.kind === 'videoinput')
+      .filter(d => d.kind === 'videoinput' && d.deviceId)
       .map(d => d.deviceId);
+
+    // Sync cameraIndex to the track that is actually open
+    if (liveState.cameras.length > 0) {
+      const activeId = liveState.stream.getVideoTracks()[0]?.getSettings()?.deviceId;
+      const idx = liveState.cameras.indexOf(activeId);
+      if (idx !== -1) liveState.cameraIndex = idx;
+    }
 
     const video = $('liveVideo');
     video.srcObject = liveState.stream;
@@ -403,7 +404,7 @@ async function startLiveFeed() {
       video.onerror = reject;
     });
 
-    // Build WebSocket URL — derived from API_BASE so it works with any host
+    // Build WebSocket URL — derived from API_BASE / WS_BASE so it works with any host
     const thresholdsJSON = encodeURIComponent(JSON.stringify(
       Object.fromEntries(Object.entries(state.thresholds).map(([k, v]) => [k, parseFloat(v)]))
     ));
@@ -420,7 +421,6 @@ async function startLiveFeed() {
     liveState.ws.onmessage = event => {
       const msg = JSON.parse(event.data);
       if (msg.type === 'frame') {
-        // Draw annotated frame onto canvas
         const canvas = $('liveCanvas');
         const ctx = canvas.getContext('2d');
         const img = new Image();
@@ -430,10 +430,8 @@ async function startLiveFeed() {
           ctx.drawImage(img, 0, 0);
         };
         img.src = 'data:image/jpeg;base64,' + msg.data;
-        // Update stats
         liveState.stats = msg.stats;
         updateLiveStats();
-        // Pipeline control: send next frame only after the previous result arrives
         if (liveState.active) sendLiveFrame();
       } else if (msg.type === 'error') {
         showLiveError(msg.message);
@@ -442,12 +440,19 @@ async function startLiveFeed() {
     };
 
     liveState.ws.onclose = () => { if (liveState.active) stopLiveFeed(); };
-    liveState.ws.onerror = () => { showLiveError('WebSocket connection failed.'); stopLiveFeed(); };
+    liveState.ws.onerror = () => { showLiveError('WebSocket connection failed. Make sure the backend server is running.'); stopLiveFeed(); };
 
   } catch (err) {
-    const msg = err.name === 'NotAllowedError'
-      ? 'Camera access denied. Please allow camera permissions and try again.'
-      : (err.message || 'Failed to start live feed.');
+    const msg =
+      err.name === 'NotAllowedError'    || err.name === 'PermissionDeniedError'
+        ? 'Camera access denied. Please allow camera permissions and try again.'
+      : err.name === 'NotFoundError'    || err.name === 'DevicesNotFoundError'
+        ? 'No camera found. Please connect a camera and try again.'
+      : err.name === 'NotReadableError' || err.name === 'TrackStartError'
+        ? 'Camera is already in use by another app. Please close it and try again.'
+      : err.name === 'OverconstrainedError'
+        ? 'Could not open the selected camera. Click Start again to use the default camera.'
+      : (err.message || 'Failed to start live feed. Check that your browser allows camera access.');
     showLiveError(msg);
     if (liveState.stream) { liveState.stream.getTracks().forEach(t => t.stop()); liveState.stream = null; }
     liveState.status = 'error';
