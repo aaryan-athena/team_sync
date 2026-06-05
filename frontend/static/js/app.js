@@ -412,14 +412,9 @@ async function startLiveFeed() {
       liveState.active = true;
       liveState.pendingFrame = false;
       liveState.sessionStart = new Date();
-      liveState.lastDetections = null;
-      liveState.lastBasketAnim = null;
       setVisible('sessionSummary', false);
       updateLiveUI();
-      liveState.frameTimer = setInterval(() => {
-        if (!liveState.pendingFrame) { liveState.pendingFrame = true; sendLiveFrame(); }
-      }, 200);
-      renderLiveCanvas();
+      sendLiveFrame();  // kick off the pipeline; each response immediately triggers the next
     };
 
     liveState.ws.onmessage = event => {
@@ -434,8 +429,8 @@ async function startLiveFeed() {
         liveState.stats = msg.stats;
         updateLiveStats();
       } else if (msg.type === 'frame') {
-        // Legacy protocol (old backend): server sends an annotated JPEG —
-        // stop the raw-video rAF loop and draw the JPEG directly instead.
+        // Server sends the annotated JPEG — boxes are drawn on the exact processed frame,
+        // so position is always correct. Draw it and immediately request the next frame.
         if (liveState.rafId) { cancelAnimationFrame(liveState.rafId); liveState.rafId = null; }
         const canvas = $('liveCanvas'), ctx = canvas.getContext('2d');
         const img = new Image();
@@ -446,6 +441,7 @@ async function startLiveFeed() {
         };
         img.src = 'data:image/jpeg;base64,' + msg.data;
         if (msg.stats) { liveState.stats = msg.stats; updateLiveStats(); }
+        if (liveState.active) sendLiveFrame();  // no timer overhead — fire immediately
       } else if (msg.type === 'error') {
         showLiveError(msg.message); stopLiveFeed();
       }

@@ -609,39 +609,28 @@ async def live_feed_ws(
             results = await loop.run_in_executor(None, processor.infer, frame)
             processor.process_detections(results, stats, frame_idx)
 
-            # Build lightweight detection list — client renders boxes/HUD in JS
-            detections = []
+            # Count players for session summary
             if results[0].boxes:
                 for box in results[0].boxes:
-                    cls  = int(box.cls[0])
-                    conf = float(box.conf[0])
-                    if conf < active_thresholds.get(cls, 0.3):
-                        continue
-                    x1, y1, x2, y2 = map(int, box.xyxy[0])
-                    detections.append({
-                        "cls":   cls,
-                        "label": Config.CLASSES[cls],
-                        "conf":  round(conf, 2),
-                        "box":   [x1, y1, x2, y2]
-                    })
-                    if cls == 2:           # Player
+                    if int(box.cls[0]) == 2 and float(box.conf[0]) >= active_thresholds.get(2, 0.3):
                         persons_detected += 1
 
+            # Draw annotations on the same frame that was processed — keeps boxes
+            # temporally aligned with what the user sees.
+            annotated = frame.copy()
+            if mode == ProcessingMode.FULL_TRACKING:
+                processor.draw_boxes(annotated, results)
             anim_prog = stats.get_animation_progress(frame_idx)
-            basket_anim = None
-            if anim_prog > 0 and stats.basket_position:
-                basket_anim = {
-                    "progress": round(anim_prog, 3),
-                    "cx": stats.basket_position[0],
-                    "cy": stats.basket_position[1]
-                }
+            if mode in (ProcessingMode.FULL_TRACKING, ProcessingMode.STATS_EFFECTS) and anim_prog > 0:
+                Visualizer.draw_basket_effect(annotated, stats.basket_position, anim_prog)
+            Visualizer.draw_hud(annotated, stats, w, h)
+
+            _, buf = cv2.imencode('.jpg', annotated, [cv2.IMWRITE_JPEG_QUALITY, 70])
+            b64 = base64.b64encode(buf.tobytes()).decode()
 
             await websocket.send_json({
-                "type":       "detections",
-                "frame_w":    w,
-                "frame_h":    h,
-                "detections": detections,
-                "basket_anim": basket_anim,
+                "type": "frame",
+                "data": b64,
                 "stats": {
                     "shots":    stats.shots_attempted,
                     "baskets":  stats.baskets_made,
