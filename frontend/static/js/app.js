@@ -424,13 +424,28 @@ async function startLiveFeed() {
 
     liveState.ws.onmessage = event => {
       const msg = JSON.parse(event.data);
+      liveState.pendingFrame = false;  // always unblock the frame pipeline first
+
       if (msg.type === 'detections') {
-        liveState.pendingFrame  = false;
-        liveState.lastDetections  = msg.detections;
-        liveState.lastBasketAnim  = msg.basket_anim;
-        liveState.lastFrameSize   = { w: msg.frame_w, h: msg.frame_h };
+        // New protocol: server returns JSON coords, client renders on top of raw video
+        liveState.lastDetections = msg.detections;
+        liveState.lastBasketAnim = msg.basket_anim;
+        liveState.lastFrameSize  = { w: msg.frame_w, h: msg.frame_h };
         liveState.stats = msg.stats;
         updateLiveStats();
+      } else if (msg.type === 'frame') {
+        // Legacy protocol (old backend): server sends an annotated JPEG —
+        // stop the raw-video rAF loop and draw the JPEG directly instead.
+        if (liveState.rafId) { cancelAnimationFrame(liveState.rafId); liveState.rafId = null; }
+        const canvas = $('liveCanvas'), ctx = canvas.getContext('2d');
+        const img = new Image();
+        img.onload = () => {
+          if (canvas.width  !== img.naturalWidth)  canvas.width  = img.naturalWidth;
+          if (canvas.height !== img.naturalHeight) canvas.height = img.naturalHeight;
+          ctx.drawImage(img, 0, 0);
+        };
+        img.src = 'data:image/jpeg;base64,' + msg.data;
+        if (msg.stats) { liveState.stats = msg.stats; updateLiveStats(); }
       } else if (msg.type === 'error') {
         showLiveError(msg.message); stopLiveFeed();
       }
