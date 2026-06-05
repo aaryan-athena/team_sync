@@ -936,6 +936,25 @@ input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
   50%       { opacity: 0.35; }
 }
 
+/* ===== SESSION SUMMARY ===== */
+.session-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+}
+.session-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+}
+.session-label { color: var(--text-muted); }
+.session-value { font-weight: 700; color: var(--text-primary); }
+
 /* Hidden helper */
 .hidden { display: none !important; }
 

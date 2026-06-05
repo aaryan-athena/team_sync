@@ -464,7 +464,7 @@ class LiveProcessor:
 
     def infer(self, frame):
         with torch.no_grad():
-            return yolo_model.predict(frame, verbose=False, conf=0.25, imgsz=640)
+            return yolo_model.predict(frame, verbose=False, conf=0.25, imgsz=416)
 
     def process_detections(self, results, stats, frame_idx):
         if not results[0].boxes: return
@@ -593,6 +593,7 @@ async def live_feed_ws(
     frame_idx = 0
     loop = asyncio.get_running_loop()
 
+    persons_detected = 0
     print(f"📡 Live session connected | mode={mode.value}", flush=True)
     try:
         while True:
@@ -606,28 +607,46 @@ async def live_feed_ws(
             h, w = frame.shape[:2]
 
             results = await loop.run_in_executor(None, processor.infer, frame)
-
             processor.process_detections(results, stats, frame_idx)
 
-            annotated = frame.copy()
-            if mode == ProcessingMode.FULL_TRACKING:
-                processor.draw_boxes(annotated, results)
-            if mode in (ProcessingMode.FULL_TRACKING, ProcessingMode.STATS_EFFECTS):
-                prog = stats.get_animation_progress(frame_idx)
-                if prog > 0:
-                    Visualizer.draw_basket_effect(annotated, stats.basket_position, prog)
-            Visualizer.draw_hud(annotated, stats, w, h)
+            # Build lightweight detection list — client renders boxes/HUD in JS
+            detections = []
+            if results[0].boxes:
+                for box in results[0].boxes:
+                    cls  = int(box.cls[0])
+                    conf = float(box.conf[0])
+                    if conf < active_thresholds.get(cls, 0.3):
+                        continue
+                    x1, y1, x2, y2 = map(int, box.xyxy[0])
+                    detections.append({
+                        "cls":   cls,
+                        "label": Config.CLASSES[cls],
+                        "conf":  round(conf, 2),
+                        "box":   [x1, y1, x2, y2]
+                    })
+                    if cls == 2:           # Player
+                        persons_detected += 1
 
-            _, buf = cv2.imencode('.jpg', annotated, [cv2.IMWRITE_JPEG_QUALITY, 75])
-            b64 = base64.b64encode(buf.tobytes()).decode()
+            anim_prog = stats.get_animation_progress(frame_idx)
+            basket_anim = None
+            if anim_prog > 0 and stats.basket_position:
+                basket_anim = {
+                    "progress": round(anim_prog, 3),
+                    "cx": stats.basket_position[0],
+                    "cy": stats.basket_position[1]
+                }
 
             await websocket.send_json({
-                "type": "frame",
-                "data": b64,
+                "type":       "detections",
+                "frame_w":    w,
+                "frame_h":    h,
+                "detections": detections,
+                "basket_anim": basket_anim,
                 "stats": {
-                    "shots": stats.shots_attempted,
-                    "baskets": stats.baskets_made,
-                    "accuracy": round(stats.accuracy, 1)
+                    "shots":    stats.shots_attempted,
+                    "baskets":  stats.baskets_made,
+                    "accuracy": round(stats.accuracy, 1),
+                    "persons":  persons_detected
                 }
             })
             frame_idx += 1

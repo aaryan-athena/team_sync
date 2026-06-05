@@ -371,6 +371,35 @@
           </button>
         </div>
 
+        <!-- Session Summary (shown after feed stops) -->
+        <div class="card card-body hidden" id="sessionSummary">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:12px;">
+            <div>
+              <h3 style="font-size:1rem;margin-bottom:3px;">Session Summary</h3>
+              <p style="font-size:0.78rem;color:var(--text-muted);">Stats from your last live session</p>
+            </div>
+            <button class="btn btn-outline btn-sm" id="btnDownloadStats">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Download Stats
+            </button>
+          </div>
+          <div class="session-meta">
+            <div class="session-row"><span class="session-label">Date</span><span class="session-value" id="sumDate">—</span></div>
+            <div class="session-row"><span class="session-label">Start Time</span><span class="session-value" id="sumTime">—</span></div>
+            <div class="session-row"><span class="session-label">Duration</span><span class="session-value" id="sumDuration">—</span></div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px;">
+            <div class="stat-card purple"><div class="stat-label">Shots</div><div class="stat-value" id="sumShots">0</div></div>
+            <div class="stat-card orange"><div class="stat-label">Baskets</div><div class="stat-value" id="sumBaskets">0</div></div>
+            <div class="stat-card cyan"><div class="stat-label">Accuracy</div><div class="stat-value" id="sumAccuracy">0%</div></div>
+          </div>
+          <div class="stat-card purple" style="margin-top:10px;text-align:center;">
+            <div class="stat-label">Player Detections</div>
+            <div class="stat-value" id="sumPersons">0</div>
+            <div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px;">cumulative across all frames</div>
+          </div>
+        </div>
+
       </div>
 
       <!-- RIGHT: Live tips + info -->
