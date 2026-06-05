@@ -1,8 +1,9 @@
 /* ===== HOOP SYNC — APP LOGIC ===== */
 
-// Set window.BACKEND_URL in the HTML before this script to point to the HF Spaces URL.
+// Set window.BACKEND_URL in the HTML before this script to point to the backend URL.
 // Example: <script>window.BACKEND_URL = 'https://your-space.hf.space';</script>
 const API_BASE = (window.BACKEND_URL || '').replace(/\/$/, '');
+const WS_BASE  = API_BASE.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:');
 
 const DEFAULT_THRESHOLDS = {
   0: 0.60, // Ball
@@ -75,6 +76,17 @@ function bindEvents() {
 
   // Test mode toggle
   $('testModeToggle').addEventListener('click', toggleTestMode);
+
+  // Tab switching
+  $('tabBtnUpload').addEventListener('click', () => switchTab('upload'));
+  $('tabBtnLive').addEventListener('click', () => switchTab('live'));
+
+  // Live feed buttons
+  $('btnStartLive').addEventListener('click', startLiveFeed);
+  $('btnStopLive').addEventListener('click', stopLiveFeed);
+  $('btnFlipCamera').addEventListener('click', flipCamera);
+  $('btnLiveAdvanced').addEventListener('click', openModal);
+  $('liveModeSelect').addEventListener('change', e => { liveState.mode = e.target.value; });
 }
 
 // ===== FILE HANDLING =====
@@ -330,4 +342,198 @@ function setVisible(id, visible) {
 function setEnabled(id, enabled) {
   const el = $(id);
   if (el) el.disabled = !enabled;
+}
+
+// ===== TAB SWITCHING =====
+function switchTab(tab) {
+  $('tabUpload').classList.toggle('hidden', tab !== 'upload');
+  $('tabLive').classList.toggle('hidden', tab !== 'live');
+  $('tabBtnUpload').classList.toggle('active', tab === 'upload');
+  $('tabBtnLive').classList.toggle('active', tab === 'live');
+  if (tab !== 'live' && liveState.active) stopLiveFeed();
+}
+
+// ===== LIVE FEED STATE =====
+const liveState = {
+  ws: null,
+  stream: null,
+  status: 'idle',   // idle | connecting | live | error
+  active: false,
+  mode: 'full_tracking',
+  stats: { shots: 0, baskets: 0, accuracy: 0 },
+  cameras: [],        // list of available video input deviceIds
+  cameraIndex: 0      // index into cameras[] currently in use
+};
+
+// ===== LIVE FEED ACTIONS =====
+async function startLiveFeed() {
+  liveState.status = 'connecting';
+  updateLiveUI();
+
+  try {
+    // Enumerate cameras on first start so flip knows what's available
+    if (liveState.cameras.length === 0) {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      liveState.cameras = devices
+        .filter(d => d.kind === 'videoinput')
+        .map(d => d.deviceId);
+    }
+
+    // Build video constraints — prefer specific deviceId when available
+    const videoConstraints = { width: { ideal: 640 }, height: { ideal: 480 } };
+    if (liveState.cameras.length > 0) {
+      videoConstraints.deviceId = { exact: liveState.cameras[liveState.cameraIndex] };
+    }
+
+    liveState.stream = await navigator.mediaDevices.getUserMedia({
+      video: videoConstraints,
+      audio: false
+    });
+
+    // After first getUserMedia enumerateDevices returns real labels/ids — refresh list
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    liveState.cameras = devices
+      .filter(d => d.kind === 'videoinput')
+      .map(d => d.deviceId);
+
+    const video = $('liveVideo');
+    video.srcObject = liveState.stream;
+    await new Promise((resolve, reject) => {
+      video.onloadedmetadata = resolve;
+      video.onerror = reject;
+    });
+
+    // Build WebSocket URL — derived from API_BASE so it works with any host
+    const thresholdsJSON = encodeURIComponent(JSON.stringify(
+      Object.fromEntries(Object.entries(state.thresholds).map(([k, v]) => [k, parseFloat(v)]))
+    ));
+    const mode = liveState.mode;
+    liveState.ws = new WebSocket(`${WS_BASE}/live/ws?mode=${mode}&thresholds=${thresholdsJSON}`);
+
+    liveState.ws.onopen = () => {
+      liveState.status = 'live';
+      liveState.active = true;
+      updateLiveUI();
+      sendLiveFrame();
+    };
+
+    liveState.ws.onmessage = event => {
+      const msg = JSON.parse(event.data);
+      if (msg.type === 'frame') {
+        // Draw annotated frame onto canvas
+        const canvas = $('liveCanvas');
+        const ctx = canvas.getContext('2d');
+        const img = new Image();
+        img.onload = () => {
+          if (canvas.width !== img.naturalWidth)  canvas.width  = img.naturalWidth;
+          if (canvas.height !== img.naturalHeight) canvas.height = img.naturalHeight;
+          ctx.drawImage(img, 0, 0);
+        };
+        img.src = 'data:image/jpeg;base64,' + msg.data;
+        // Update stats
+        liveState.stats = msg.stats;
+        updateLiveStats();
+        // Pipeline control: send next frame only after the previous result arrives
+        if (liveState.active) sendLiveFrame();
+      } else if (msg.type === 'error') {
+        showLiveError(msg.message);
+        stopLiveFeed();
+      }
+    };
+
+    liveState.ws.onclose = () => { if (liveState.active) stopLiveFeed(); };
+    liveState.ws.onerror = () => { showLiveError('WebSocket connection failed.'); stopLiveFeed(); };
+
+  } catch (err) {
+    const msg = err.name === 'NotAllowedError'
+      ? 'Camera access denied. Please allow camera permissions and try again.'
+      : (err.message || 'Failed to start live feed.');
+    showLiveError(msg);
+    if (liveState.stream) { liveState.stream.getTracks().forEach(t => t.stop()); liveState.stream = null; }
+    liveState.status = 'error';
+    updateLiveUI();
+  }
+}
+
+function sendLiveFrame() {
+  if (!liveState.active || !liveState.ws || liveState.ws.readyState !== WebSocket.OPEN) return;
+  const video = $('liveVideo');
+  const offscreen = document.createElement('canvas');
+  offscreen.width = 640;
+  offscreen.height = 480;
+  offscreen.getContext('2d').drawImage(video, 0, 0, 640, 480);
+  offscreen.toBlob(blob => {
+    if (liveState.active && liveState.ws && liveState.ws.readyState === WebSocket.OPEN) {
+      liveState.ws.send(blob);
+    }
+  }, 'image/jpeg', 0.8);
+}
+
+function stopLiveFeed() {
+  liveState.active = false;
+  if (liveState.ws) { liveState.ws.close(); liveState.ws = null; }
+  if (liveState.stream) { liveState.stream.getTracks().forEach(t => t.stop()); liveState.stream = null; }
+  $('liveVideo').srcObject = null;
+  liveState.status = 'idle';
+  liveState.stats = { shots: 0, baskets: 0, accuracy: 0 };
+  updateLiveUI();
+}
+
+async function flipCamera() {
+  if (liveState.cameras.length < 2) return;
+  // Advance to the next camera in the list
+  liveState.cameraIndex = (liveState.cameraIndex + 1) % liveState.cameras.length;
+  // Stop current stream without resetting stats or WS
+  if (liveState.stream) { liveState.stream.getTracks().forEach(t => t.stop()); liveState.stream = null; }
+  // Reopen with the new camera
+  try {
+    liveState.stream = await navigator.mediaDevices.getUserMedia({
+      video: { deviceId: { exact: liveState.cameras[liveState.cameraIndex] }, width: { ideal: 640 }, height: { ideal: 480 } },
+      audio: false
+    });
+    const video = $('liveVideo');
+    video.srcObject = liveState.stream;
+    await new Promise(resolve => { video.onloadedmetadata = resolve; });
+  } catch (err) {
+    showLiveError('Could not switch camera: ' + (err.message || err));
+  }
+}
+
+function showLiveError(msg) {
+  setVisible('liveError', true);
+  $('liveErrorText').textContent = msg;
+  liveState.status = 'error';
+}
+
+function updateLiveStats() {
+  $('liveStatShots').textContent = liveState.stats.shots ?? 0;
+  $('liveStatBaskets').textContent = liveState.stats.baskets ?? 0;
+  $('liveStatAccuracy').textContent = (liveState.stats.accuracy ?? 0).toFixed(1) + '%';
+}
+
+function updateLiveUI() {
+  const isLive = liveState.status === 'live';
+  const isConnecting = liveState.status === 'connecting';
+  const isActive = isLive || isConnecting;
+
+  setVisible('liveCanvas', isLive);
+  setVisible('livePlaceholder', !isLive);
+  setVisible('liveDot', isLive);
+  setVisible('btnStartLive', !isActive);
+  setVisible('btnStopLive', isActive);
+  setVisible('liveStatsSection', isLive);
+  setVisible('btnFlipCamera', isLive && liveState.cameras.length > 1);
+  setEnabled('liveModeSelect', !isActive);
+
+  if (liveState.status !== 'error') setVisible('liveError', false);
+
+  const badgeMap = {
+    idle:       { text: 'Ready',        cls: 'badge-purple' },
+    connecting: { text: 'Connecting…',  cls: 'badge-orange' },
+    live:       { text: 'LIVE',         cls: 'badge-live'   },
+    error:      { text: 'Error',        cls: 'badge-error'  }
+  };
+  const bi = badgeMap[liveState.status] || badgeMap.idle;
+  const badge = $('liveBadge');
+  if (badge) { badge.textContent = bi.text; badge.className = 'badge ' + bi.cls; }
 }

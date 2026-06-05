@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import torch
 from ultralytics import YOLO
-from fastapi import FastAPI, File, UploadFile, HTTPException, Request
+from fastapi import FastAPI, File, UploadFile, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -17,6 +17,8 @@ from collections import deque
 from enum import Enum
 import time
 import json
+import asyncio
+import base64
 
 # ==================== CONFIGURATION ====================
 class Config:
@@ -451,6 +453,46 @@ class VideoProcessor:
             "stats": {"shots": stats.shots_attempted, "baskets": stats.baskets_made, "accuracy": stats.accuracy}
         }
 
+# ==================== LIVE PROCESSOR ====================
+
+class LiveProcessor:
+    """Handles per-frame inference for the live WebSocket feed."""
+
+    def __init__(self, mode: ProcessingMode, thresholds: dict):
+        self.mode = mode
+        self.thresholds = thresholds
+
+    def infer(self, frame):
+        with torch.no_grad():
+            return yolo_model.predict(frame, verbose=False, conf=0.25, imgsz=640)
+
+    def process_detections(self, results, stats, frame_idx):
+        if not results[0].boxes: return
+        for box in results[0].boxes:
+            cls = int(box.cls[0])
+            conf = float(box.conf[0])
+            if conf < self.thresholds.get(cls, 0.3): continue
+            x1, y1, x2, y2 = map(int, box.xyxy[0])
+            center = ((x1+x2)//2, (y1+y2)//2)
+            if cls == 3: stats.last_known_basket_pos = center
+            elif cls == 4: stats.register_shot(frame_idx)
+            elif cls == 1:
+                target_pos = stats.last_known_basket_pos or center
+                stats.register_basket(frame_idx, target_pos)
+
+    def draw_boxes(self, frame, results):
+        if not results[0].boxes: return
+        for box in results[0].boxes:
+            cls = int(box.cls[0])
+            conf = float(box.conf[0])
+            if conf < self.thresholds.get(cls, 0.3): continue
+            x1, y1, x2, y2 = map(int, box.xyxy[0])
+            color = Config.COLORS.get(cls, (255, 255, 255))
+            label = f"{Config.CLASSES.get(cls)} {conf:.2f}"
+            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+            cv2.putText(frame, label, (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+
+
 # ==================== FASTAPI APP ====================
 app = FastAPI(title="Team Sync – AI Basketball Analytics")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"], allow_credentials=True)
@@ -524,6 +566,81 @@ def download_result(file_id: str):
     # We don't delete immediately here to allow retries. 
     # The AutoCleanup service will handle it after RETENTION_SECONDS.
     return FileResponse(path, media_type="video/mp4", filename=f"basket_ai_{file_id}.mp4")
+
+@app.websocket("/live/ws")
+async def live_feed_ws(
+    websocket: WebSocket,
+    mode: ProcessingMode = ProcessingMode.FULL_TRACKING,
+    thresholds: str = None
+):
+    """WebSocket endpoint for real-time live camera feed processing.
+
+    Browser sends JPEG frames as binary blobs; server responds with JSON containing
+    the annotated frame (base64 JPEG) and current game stats.
+    """
+    await websocket.accept()
+
+    active_thresholds = Config.THRESHOLDS.copy()
+    if thresholds:
+        try:
+            for k, v in json.loads(thresholds).items():
+                active_thresholds[int(k)] = float(v)
+        except Exception:
+            pass
+
+    processor = LiveProcessor(mode, active_thresholds)
+    stats = GameStats(fps=15.0)   # 15 fps assumed for cooldown timing
+    frame_idx = 0
+    loop = asyncio.get_running_loop()
+
+    print(f"📡 Live session connected | mode={mode.value}", flush=True)
+    try:
+        while True:
+            raw = await websocket.receive_bytes()
+
+            nparr = np.frombuffer(raw, np.uint8)
+            frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            if frame is None:
+                continue
+
+            h, w = frame.shape[:2]
+
+            results = await loop.run_in_executor(None, processor.infer, frame)
+
+            processor.process_detections(results, stats, frame_idx)
+
+            annotated = frame.copy()
+            if mode == ProcessingMode.FULL_TRACKING:
+                processor.draw_boxes(annotated, results)
+            if mode in (ProcessingMode.FULL_TRACKING, ProcessingMode.STATS_EFFECTS):
+                prog = stats.get_animation_progress(frame_idx)
+                if prog > 0:
+                    Visualizer.draw_basket_effect(annotated, stats.basket_position, prog)
+            Visualizer.draw_hud(annotated, stats, w, h)
+
+            _, buf = cv2.imencode('.jpg', annotated, [cv2.IMWRITE_JPEG_QUALITY, 75])
+            b64 = base64.b64encode(buf.tobytes()).decode()
+
+            await websocket.send_json({
+                "type": "frame",
+                "data": b64,
+                "stats": {
+                    "shots": stats.shots_attempted,
+                    "baskets": stats.baskets_made,
+                    "accuracy": round(stats.accuracy, 1)
+                }
+            })
+            frame_idx += 1
+
+    except WebSocketDisconnect:
+        print(f"📡 Live session ended. Frames processed: {frame_idx}", flush=True)
+    except Exception as e:
+        print(f"❌ Live session error: {e}", flush=True)
+        try:
+            await websocket.send_json({"type": "error", "message": str(e)})
+        except Exception:
+            pass
+
 
 if __name__ == "__main__":
     print("\n🏀 TEAM SYNC SERVER STARTING...")
