@@ -1,0 +1,23 @@
+name: Keep HF Space Alive
+
+on:
+  schedule:
+    # Runs every 25 minutes — well within HF's 48-hour sleep window
+    - cron: '*/25 * * * *'
+  workflow_dispatch: # Allow manual trigger from GitHub UI
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping HF Space health endpoint
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" \
+            --max-time 30 \
+            "${{ secrets.HF_SPACE_URL }}/health")
+          echo "Response code: $response"
+          if [ "$response" != "200" ]; then
+            echo "Warning: Space returned $response — it may be waking up."
+          else
+            echo "Space is alive."
+          fi
